@@ -59,7 +59,7 @@ def get_ocr_result_with_small_my(img_path):
 
     # 发送POST请求到OCR服务端
     ocr_url = "http://114.55.254.123/v1/ocr/upload"
-    ocr_headers = {"X-API-Key": "YOUR_OCR_API_KEY"}
+    ocr_headers = {"X-API-Key": "35013bf90d5d49a3797d808f48967a78e4ed5bd1be1bd19c"}
     try:
         #print_my(f"正在请求OCR服务端: {ocr_url}")
         with open(img_path_of_real_ocr, 'rb') as f:

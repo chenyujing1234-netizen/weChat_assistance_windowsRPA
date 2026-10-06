@@ -161,6 +161,7 @@ from download_helper import download_file
 DEBUG_CURREN_MEM("main.py 444")
 from excel_helper import *
 from pic_button import PicButton
+import wechat_db_helper
 from llm_helper import *
 from custom_tab_bar import CustomTabBar
 from clickable_label import ClickableLabel
@@ -2045,6 +2046,34 @@ def main_work_thread(table, bSyncFriend, bSyncTagGroup):
     
     return
         
+# 通过本地微信数据库同步好友的后台线程
+def sync_friend_from_db_thread(table):
+    try:
+        print_my("^-^开始通过本地微信数据库同步通讯录...")
+        iRet, friend_info_list, err_msg = wechat_db_helper.sync_friends_from_local_db(print_my)
+        if iRet != 0:
+            print_my("!!!!本地数据库方式同步通讯录失败:{}".format(err_msg))
+            table.signal_of_table.emit("tooltip_{}".format("本地数据库同步好友失败"))
+            return
+
+        g_config_json_data["FRIEND_INFO_LIST"] = friend_info_list
+        save_config_data(g_config_json_data, g_config_path)
+        # 更新原有的变量
+        g_config_json_data["username_of_can_deposit_list"] = [friend_info["friend_name"] for friend_info in g_config_json_data["FRIEND_INFO_LIST"]]
+        save_config_data(g_config_json_data, g_config_path)
+        if "username_of_can_deposit_list" in g_config_json_data:
+            table.username_of_can_deposit_list = g_config_json_data["username_of_can_deposit_list"]
+        print_my("^-^本地数据库方式同步通讯录成功,共有{}个好友".format(len(friend_info_list)))
+        table.signal_of_table.emit("reload_friend_list_view")
+        table.signal_of_table.emit("tooltip_{}".format("本地数据库同步好友成功"))
+    except Exception as e:
+        print_my("!!!!本地数据库方式同步通讯录异常:{}".format(e))
+        traceback.print_exc()
+        table.signal_of_table.emit("tooltip_{}".format("本地数据库同步好友失败"))
+    # chenyj debug
+    print("<===本地数据库同步好友线程名称:{} 结束时间:{}".format(threading.current_thread().name, time.strftime("%Y-%m-%d %H:%M:%S")))
+    return
+
 # 授权对话框
 class LicenceWindow(QDialog):
     _signal = pyqtSignal(str)
@@ -2701,6 +2730,29 @@ class Table(QWidget):
 		self.friend_info_list = g_config_json_data["FRIEND_INFO_LIST"]
 		self.syncFriendBtn.clicked.connect(self.syncFriendBtnFun)
 		self.layout_friendBtn.addWidget(self.syncFriendBtn)
+		# 通过本地微信数据库同步好友(需要微信已登录)
+		self.syncFriendDbBtn = QPushButton("同步好友(本地)")
+		self.syncFriendDbBtn.setStyleSheet("""
+            QPushButton {
+                color: blue; /* 白色字体 */
+                font-size: 22px; /* 字体大小 */
+                font-weight: bold; /* 字体加粗 */
+                border: 1px solid #1A387B; /* 边框样式 */
+                border-radius: 5px; /* 圆角边框 */
+                padding: 5px 10px; /* 增加按钮的内边距，使按钮看起来更大 */
+            }
+            QPushButton:disabled {
+                background-color: gray; /* 灰色背景 */
+                color: black; /* 白色字体 */
+                font-size: 22px; /* 字体大小 */
+                font-weight: bold; /* 字体加粗 */
+                border: 2px solid #1A387B; /* 边框样式 */
+                border-radius: 5px; /* 圆角边框 */
+                padding: 5px 10px; /* 增加按钮的内边距，使按钮看起来更大 */
+            }
+		""")
+		self.syncFriendDbBtn.clicked.connect(self.syncFriendDbBtnFun)
+		self.layout_friendBtn.addWidget(self.syncFriendDbBtn)
 		#self.layout_friendlist.addWidget(self.syncFriendBtn)
 		self.layout_friendlist.addLayout(self.layout_friendBtn)
 		# 把layout_productlist加到tab里
@@ -5480,9 +5532,47 @@ class Table(QWidget):
 				print("等待窗口依然存在, syncFriendBtnFun, 但是线程依然在运行, 不做任何处理")
 				return 
 		"""
-		return 
+		return
 
-    # "添加客户组"按钮响应函数    
+	# "同步好友(本地)"按钮响应函数(通过本地微信数据库获取好友列表)
+	def syncFriendDbBtnFun(self):
+		if False == self.loginAndPaymentFunc():
+			return
+		if self.applicationState == ApplicationState.Running:
+			print("!!!!请先停止任务")
+			QMessageBox.information(self, APP_NAME, "请先停止\"私域精灵\"再同步好友", QMessageBox.Yes)
+			return
+
+		# 本地数据库方式要求微信(4.x)已登录
+		try:
+			b_wechat_running = wechat_db_helper.is_wechat_v4_running()
+		except Exception as e:
+			print("!!!!syncFriendDbBtnFun, 检测微信进程异常:{}".format(e))
+			b_wechat_running = False
+		if False == b_wechat_running:
+			QMessageBox.information(self, APP_NAME,
+				"本地数据库方式要求微信已登录。\n\n请先打开微信(4.x版本)并完成登录，然后再点击【同步好友(本地)】。",
+				QMessageBox.Yes)
+			return
+
+		str_tip = "将通过本地微信数据库同步好友（无需RPA翻页，速度更快）。\n\n注意：同步期间请保持微信处于登录状态，不要退出微信。"
+		if len(g_config_json_data["FRIEND_INFO_LIST"]) > 0:
+			str_tip += "\n\n重新同步后现有的好友列表将被覆盖，确定想同步?"
+		else:
+			str_tip += "\n\n确定开始同步?"
+		result = QMessageBox.question(self, APP_NAME, str_tip, QMessageBox.Yes | QMessageBox.No)
+		if(result == QMessageBox.No):
+			return
+
+		if True == is_thread_running(sync_friend_from_db_thread.__name__):
+			print("!!!!syncFriendDbBtnFun, 本地数据库同步好友线程已经在运行")
+			return
+		print_my("===>开始本地数据库方式同步通讯录(初始化本地数据库环境...)")
+		thread = threading.Thread(target = sync_friend_from_db_thread, args = (self, ))
+		thread.start()
+		return
+
+    # "添加客户组"按钮响应函数
 	def addUsergroupBtnFun(self):
 		if False == self.loginAndPaymentFunc():
 			return
