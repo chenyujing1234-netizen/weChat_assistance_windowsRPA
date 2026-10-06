@@ -1,7 +1,27 @@
 # -*- coding: utf-8 -*-
+import sys
+if sys.platform == 'win32':
+    # 冻结(PyInstaller)环境下，import PyQt5.QtWidgets 即会把主线程 COM 初始化为 STA；
+    # 必须在任何导入之前显式声明 STA(coinit_flags=2)，否则 pywinauto 导入时按 MTA 探测，
+    # comtypes 会以 MTA 去初始化 STA 线程，触发
+    # OSError: [WinError -2147417850] 无法在设置线程模式后对其加以更改。
+    sys.coinit_flags = 2  # COINIT_APARTMENTTHREADED，与 Qt 主线程一致
+
+# Python 3.7 的 typing 缺少 Literal 等名字（3.8+ 才有），sparkai 等 SDK 的
+# `from typing import Literal` 会失败。开发环境由 sitecustomize.py 注入补齐，
+# 但 PyInstaller 不会打包 sitecustomize，必须在这里自行注入（须在任何第三方导入之前）。
+try:
+    import typing
+    import typing_extensions as _te
+    for _name in ("Literal", "TypedDict", "Protocol", "Final", "get_origin",
+                  "get_args", "runtime_checkable", "SupportsIndex", "_ProtocolMeta"):
+        if not hasattr(typing, _name) and hasattr(_te, _name):
+            setattr(typing, _name, getattr(_te, _name))
+except Exception:
+    pass
+
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
-import sys
 from splash_screen import SplashScreen
 import ctypes  
 
