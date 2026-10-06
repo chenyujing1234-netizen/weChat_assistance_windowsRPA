@@ -1,0 +1,48 @@
+# ===== 密钥与本地备份（勿提交）=====
+keys_backup.local.txt
+
+# ===== 大体积素材/媒体/安装包 =====
+素材/
+*.zip
+*.exe
+*.lnk
+*.msi
+
+# ===== 历史/参考/辅助项目目录 =====
+src_2024_8_8/
+AutoGLM/
+eylink-clone/
+eylink-clone_xxx/
+DongTaiTu/
+html/
+win7/
+TuoGuanContainer/
+Tesseract-OCR/
+Tesseract-OCR_TuoGuanContainer_v4/
+tesseract-ocr语言包/
+yunQue/
+激活智能体/
+竞品_*/
+ai_generate_img/
+
+# ===== 运行时产物与临时文件 =====
+__pycache__/
+*.pyc
+build/
+dist/
+distxxx/
+screenshot_img/
+screenshot_img_20250925/
+message_sessions/
+.same/
+*.log
+
+# ===== 源码备份文件 =====
+*_bak*
+*.bak
+main.py_2024_8_17
+yang_hao_opt.py_bak_2024_8_28
+config_helper.py_bak
+
+# ===== 临时生成的UUID命名图片 =====
+[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f]*.png
